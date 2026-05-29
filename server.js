@@ -17,7 +17,10 @@ io.on('connection', (socket) => {
   });
 
   socket.on('chat message', (msg) => {
-    io.emit('chat message', msg);
+    io.emit('chat message', {
+      ...msg,
+      sentAt: new Date().toISOString(),
+    });
   });
   
   // Room functionality (for sensor apps)

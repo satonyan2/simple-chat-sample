@@ -7,7 +7,9 @@
       #form { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }
       #input { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; }
       #input:focus { outline: none; }
+      #counter { align-self: center; color: #555; font-size: 0.8rem; margin: 0 0.5rem; white-space: nowrap; }
       #form > button { background: #333; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; }
+      #form > button:disabled { background: #999; cursor: not-allowed; }
       #messages { list-style-type: none; margin: 0; padding: 0; width: 100%; }
       .message-item {
         display: flex;
@@ -38,6 +40,22 @@
         color: #555;
         margin-bottom: 0.2rem;
       }
+      .message-meta {
+        display: flex;
+        align-items: baseline;
+        gap: 0.45rem;
+        font-size: 0.8rem;
+        color: #555;
+        margin-bottom: 0.2rem;
+      }
+      .message-item.me .message-meta {
+        flex-direction: row-reverse;
+      }
+      .timestamp {
+        color: #888;
+        font-size: 0.72rem;
+        white-space: nowrap;
+      }
       .message-bubble {
         padding: 0.5rem 1rem;
         border-radius: 1rem;
@@ -66,7 +84,7 @@
       <ul id="messages"></ul>
     </div>
     <form id="form" action="">
-      <input id="input" autocomplete="off" /><button>Send</button>
+      <input id="input" autocomplete="off" /><span id="counter">0/140</span><button id="send" type="submit">Send</button>
     </form>
     <script src="/socket.io/socket.io.js"></script>
     <script>
@@ -82,7 +100,10 @@
 
       const form = document.getElementById('form');
       const input = document.getElementById('input');
+      const counter = document.getElementById('counter');
+      const send = document.getElementById('send');
       const messages = document.getElementById('messages');
+      const maxLength = 140;
 
       function getColorFromId(id) {
         let hash = 0;
@@ -101,14 +122,33 @@
         window.scrollTo(0, document.body.scrollHeight);
       }
 
+      function formatTimestamp(value) {
+        const date = value ? new Date(value) : new Date();
+        if (Number.isNaN(date.getTime())) {
+          return '';
+        }
+        return date.toLocaleTimeString('ja-JP', {
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      }
+
       form.addEventListener('submit', (e) => {
         e.preventDefault();
-        if (input.value) {
+        if (input.value && input.value.length <= maxLength) {
           const messageData = { id: clientId, msg: input.value };
           socket.emit('chat message', messageData);
           input.value = '';
+          updateCounter();
         }
       });
+
+      function updateCounter() {
+        counter.textContent = `${input.value.length}/${maxLength}`;
+        send.disabled = input.value.length > maxLength;
+      }
+
+      input.addEventListener('input', updateCounter);
 
       socket.on('welcome', (id) => {
         displaySystemMessage(`あなたのユーザIDは ${id.substring(0, 6)} です`);
@@ -141,15 +181,25 @@
         const messageContent = document.createElement('div');
         messageContent.classList.add('message-content');
 
+        const messageMeta = document.createElement('div');
+        messageMeta.classList.add('message-meta');
+
         const username = document.createElement('div');
         username.classList.add('username');
         username.textContent = data.id.substring(0, 6);
+
+        const timestamp = document.createElement('time');
+        timestamp.classList.add('timestamp');
+        timestamp.dateTime = data.sentAt || '';
+        timestamp.textContent = formatTimestamp(data.sentAt);
 
         const messageBubble = document.createElement('div');
         messageBubble.classList.add('message-bubble');
         messageBubble.textContent = data.msg;
 
-        messageContent.appendChild(username);
+        messageMeta.appendChild(username);
+        messageMeta.appendChild(timestamp);
+        messageContent.appendChild(messageMeta);
         messageContent.appendChild(messageBubble);
 
         item.appendChild(userIcon);
